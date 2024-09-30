@@ -191,4 +191,4 @@ notebook/result.png
 notebook/coding
 *.csv
 *.db
-*.md
+gpt*.md
