@@ -17,8 +17,8 @@ cursor = conn.cursor()
 # gpt-4o
 config_list = [
     {
-        # "model": "gpt-4o-2024-08-06",
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-4o-2024-08-06",
+        # "model": "gpt-3.5-turbo",
         "api_key": os.getenv("OPENAI_API_KEY"),
     }
 ]
@@ -231,7 +231,7 @@ pn.extension(design="material")
 def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
     user_proxy.initiate_chat(manager, message=contents)
     
-chat_interface = pn.chat.ChatInterface(callback=callback, show_undo=False, show_rerun=False)
+chat_interface = pn.chat.ChatInterface(callback=callback)
 chat_interface.send("Welcome! How can I assist you with your marketing campaign today? Please mention the 'user_id' you want write the marketing campaign for.", user="Campaign Agent", respond=False, avatar='🧠')
 chat_interface.servable()
 pn.serve(chat_interface, port=8080, show=True)
