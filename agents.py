@@ -3,7 +3,7 @@ import json
 import autogen
 import sqlite3
 from contextlib import contextmanager
-
+import panel as pn
 import requests
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -32,17 +32,6 @@ config_list = [
 #         "aws_secret_key": os.getenv("AWS_SECRET_KEY"),
 #     }
 # ]
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # You can specify allowed origins here
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
-)
-# Define the Agents
 
 code_interpreter = autogen.UserProxyAgent(
     "code_interpreter",
@@ -162,6 +151,13 @@ def retrieve_user_data(user_id: int):
             return user_data_dict
     return None
 
+user_proxy = autogen.UserProxyAgent(
+    "user_proxy",
+    human_input_mode="NEVER",
+    code_execution_config=False,
+    default_auto_reply="",
+)
+
 # Put them in a virtual room
 groupchat = autogen.GroupChat(
     agents=[data_retriever, code_interpreter, analyst, email_agent],
@@ -184,21 +180,61 @@ task = """
 Analyze the customer data with user_id '83153' and create an email marketing campaign targeting different audience segments with personalized content. Use metrics such as total_spent, purchase_frequency, loyalty_points_balance, email_click_rate, and preferred_payment_method to inform your strategies. Ensure the campaign is optimized for engagement and conversion, with real-time adaptation based on feedback.
 """
 
-user_proxy = autogen.UserProxyAgent(
-    "user_proxy",
-    human_input_mode="NEVER",
-    code_execution_config=False,
-    default_auto_reply="",
-)
-class ChatMessage(BaseModel):
-    message: str
 
-@app.post("/chat")
-def chat(chat_message: ChatMessage):
-    task = chat_message.message
-    user_proxy.initiate_chat(manager, message=task)
-    last_messages = groupchat.messages
-    return {'last_messages': last_messages}
+avatar = {user_proxy.name:"👨‍💼", manager.name:"👩‍💻", data_retriever.name:"👩‍🔬", code_interpreter.name:"🛠", email_agent.name:'📝', analyst.name: '📊'}
+
+def print_messages(recipient, messages, sender, config):
+
+    #chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
+    print(f"Messages from: {sender.name} sent to: {recipient.name} | num messages: {len(messages)} | message: {messages[-1]}")
+    
+    if all(key in messages[-1] for key in ['name']):
+        chat_interface.send(messages[-1]['content'], user=messages[-1]['name'], avatar=avatar[messages[-1]['name']], respond=False)
+    else:
+        chat_interface.send(messages[-1]['content'], user='SecretGuy', avatar='🥷', respond=False)
+
+    return False, None
+
+
+
+user_proxy.register_reply(
+    [autogen.Agent, None],
+    reply_func=print_messages,
+    config={"callback": None},
+)
+
+data_retriever.register_reply(
+    [autogen.Agent, None],
+    reply_func=print_messages,
+    config={"callback": None},
+)
+
+code_interpreter.register_reply(
+    [autogen.Agent, None],
+    reply_func=print_messages,
+    config={"callback": None},
+)
+
+analyst.register_reply(
+    [autogen.Agent, None],
+    reply_func=print_messages,
+    config={"callback": None},
+)
+
+email_agent.register_reply(
+    [autogen.Agent, None],
+    reply_func=print_messages,
+    config={"callback": None},
+)
+
+pn.extension(design="material")
+def callback(contents: str, user: str, instance: pn.chat.ChatInterface):
+    user_proxy.initiate_chat(manager, message=contents)
+    
+chat_interface = pn.chat.ChatInterface(callback=callback, show_undo=False, show_rerun=False)
+chat_interface.send("Welcome! How can I assist you with your marketing campaign today? Please mention the 'user_id' you want write the marketing campaign for.", user="Campaign Agent", respond=False, avatar='🧠')
+chat_interface.servable()
+pn.serve(chat_interface, port=8080, show=True)
 
 
 # start the agents to work
